@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Maps API Integrated Features</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        #map {
+            height: 500px;
+            width: 100%;
+        }
+        #controls {
+            padding: 20px;
+            background-color: #f0f0f0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+        }
+        #controls input, #controls button {
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        #controls button {
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+        }
+        #controls button:hover {
+            background-color: #0056b3;
+        }
+        #places-results {
+            padding: 20px;
+            background-color: #e8f0fe;
+            margin-top: 10px;
+            border-top: 1px solid #ccc;
+            overflow-y: auto;
+            max-height: 200px;
+        }
+        .container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        .footer {
+            text-align: center;
+            padding: 10px;
+            background-color: #333;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Google Maps API Integrated Features</h2>
+        <div id="controls">
+            <input type="text" id="origin" placeholder="Detecting current location..." readonly>
+            <input type="text" id="destination" placeholder="Enter destination">
+            <button onclick="findOptimizedRoute()">Find Route</button>
+            <button onclick="getElevation()">Get Elevation</button>
+            <button onclick="getAirQuality()">Check Air Quality</button>
+            <button onclick="getAddressValidation()">Validate Address</button>
+            <button onclick="getTimeZone()">Get Time Zone</button>
+            <button onclick="findPlaces()">Find Places</button>
+            <button onclick="getSolarData()">Get Solar Data (Server Side)</button>
+            <button onclick="getPollenData()">Pollen Data (External API)</button>
+            <button onclick="getAerialView()">Aerial View (Tile Provider)</button>
+            <button onclick="getRoads()">Roads API (Console Log)</button>
+            <button onclick="getMapTiles()">Map Tiles (Console Log)</button>
+            <button onclick="getMapsDatasets()">Maps Datasets (Console Log)</button>
+        </div>
+        <div id="map"></div>
+        <div id="places-results"></div>
+    </div>
+    <footer class="footer">
+        <p>&copy; 2024 Google Maps API Demo</p>
+    </footer>
+
+    <script>
+        let map;
+        let directionsService;
+        let directionsRenderer;
+        let userLat, userLng;
+        let geocoder;
+        let placesService;
+
+        function initMap() {
+            map = new google.maps.Map(document.getElementById("map"), {
+                center: { lat: 37.7749, lng: -122.4194 },
+                zoom: 12,
+            });
+            directionsService = new google.maps.DirectionsService();
+            directionsRenderer = new google.maps.DirectionsRenderer();
+            directionsRenderer.setMap(map);
+            geocoder = new google.maps.Geocoder();
+            placesService = new google.maps.places.PlacesService(map);
+            
+            getCurrentLocation();
+        }
+
+        function getCurrentLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(position => {
+                    userLat = position.coords.latitude;
+                    userLng = position.coords.longitude;
+                    const latLng = new google.maps.LatLng(userLat, userLng);
+                    
+                    geocoder.geocode({ location: latLng }, (results, status) => {
+                        if (status === "OK" && results[0]) {
+                            document.getElementById("origin").value = results[0].formatted_address;
+                        } else {
+                            alert("Could not determine current location address");
+                        }
+                    });
+                    
+                    map.setCenter({ lat: userLat, lng: userLng });
+                }, () => {
+                    alert("Geolocation failed. Please enter origin manually.");
+                });
+            } else {
+                alert("Geolocation is not supported by this browser.");
+            }
+        }
+
+        function findOptimizedRoute() {
+            const origin = document.getElementById("origin").value;
+            const destination = document.getElementById("destination").value;
+
+            if (!origin || !destination) {
+                alert("Please enter both origin and destination");
+                return;
+            }
+
+            const request = {
+                origin: origin,
+                destination: destination,
+                travelMode: google.maps.TravelMode.DRIVING,
+                optimizeWaypoints: true
+            };
+
+            directionsService.route(request, (result, status) => {
+                if (status === google.maps.DirectionsStatus.OK) {
+                    directionsRenderer.setDirections(result);
+                } else {
+                    alert("Error finding route: " + status);
+                }
+            });
+        }
+
+        function getElevation() {
+            if (!userLat || !userLng) {
+                alert("Location not detected. Try again.");
+                return;
+            }
+            
+            fetch(`https://maps.googleapis.com/maps/api/elevation/json?locations=${userLat},${userLng}&key=YOUR_API_KEY`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.results && data.results.length > 0) {
+                        alert("Elevation: " + data.results[0].elevation + " meters");
+                    } else {
+                        alert("Elevation data not available");
+                    }
+                })
+                .catch(error => alert("Error fetching elevation data: " + error));
+        }
+
+        function getAirQuality() {
+            if (!userLat || !userLng) {
+                alert("Location not detected. Try again.");
+                return;
+            }
+            
+            fetch(`https://airquality.googleapis.com/v1/currentConditions:lookup?key=YOUR_API_KEY&location.latitude=${userLat}&location.longitude=${userLng}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.indexes && data.indexes.length > 0) {
+                        alert("Air Quality Index: " + data.indexes[0].aqi);
+                    } else {
+                        alert("Air Quality data not available for this location.");
+                    }
+                })
+                .catch(error => alert("Error fetching air quality data: " + error));
+        }
+
+        function getAddressValidation() {
+            const address = document.getElementById("destination").value;
+            fetch(`https://addressvalidation.googleapis.com/v1:validateAddress?key=YOUR_API_KEY`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ address: { addressLines: [address] } })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.result && data.result.verdict && data.result.verdict.addressComplete) {
+                    alert("Address is valid.");
+                } else {
+                    alert("Address validation failed.");
+                }
+            })
+            .catch(error => alert("Error validating address: " + error));
+        }
+
+        function getTimeZone() {
+            if (!userLat || !userLng) {
+                alert("Location not detected. Try again.");
+                return;
+            }
+            fetch(`https://maps.googleapis.com/maps/api/timezone/json?location=${userLat},${userLng}&timestamp=${Math.floor(Date.now() / 1000)}&key=YOUR_API_KEY`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === "OK") {
+                        alert("Time Zone: " + data.timeZoneId);
+                    } else {
+                        alert("Time Zone data not available");
+                    }
+                })
+                .catch(error => alert("Error fetching time zone data: " + error));
+        }
+
+        function findPlaces() {
+            const request = {
+                location: new google.maps.LatLng(userLat, userLng),
+                radius: '500',
+                type: ['restaurant']
+            };
+            placesService.nearbySearch(request, (results, status) => {
+                if (status === google.maps.places.PlacesServiceStatus.OK) {
+                    const placesResults = document.getElementById("places-results");
+                    placesResults.innerHTML = '';
+                    results.forEach(place => {
+                        const placeElement = document.createElement('div');
+                        placeElement.textContent = place.name;
+                        placesResults.appendChild(placeElement);
+                    });
+                } else {
+                    alert("Error finding places: " + status);
+                }
+            });
+        }
+
+        function getSolarData() {
+            // Implement server-side call to get solar data
+            alert("Solar Data feature is not implemented yet.");
+        }
+
+        function getPollenData() {
+            // Implement external API call to get pollen data
+            alert("Pollen Data feature is not implemented yet.");
+        }
+
+        function getAerialView() {
+            // Implement tile provider call to get aerial view
+            alert("Aerial View feature is not implemented yet.");
+        }
+
+        function getRoads() {
+            // Implement Roads API call
+            alert("Roads API feature is not implemented yet.");
+        }
+
+        function getMapTiles() {
+            // Implement Map Tiles API call
+            alert("Map Tiles feature is not implemented yet.");
+        }
+
+        function getMapsDatasets() {
+            // Implement Maps Datasets API call
+            alert("Maps Datasets feature is not implemented yet.");
+        }
+    </script>
+    <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBp5HdXfbUUx8ATPTpnW3EWQmmYjOCk6G4&libraries=places&callback=initMap"></script>
+</body>
+</html>
